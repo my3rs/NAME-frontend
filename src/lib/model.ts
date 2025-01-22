@@ -87,7 +87,7 @@ export class User implements IUser {
 
 export class Tag {
     id: number;
-    no: string;
+    slug: string;
     text: string;
     path: string;
     readablePath: string;
@@ -98,7 +98,7 @@ export class Tag {
     constructor() {
         this.depth = 0;
         this.id = 0;
-        this.no = "";
+        this.slug = "";
         this.text = '';
         this.path = '';
         this.readablePath = '';
@@ -140,19 +140,20 @@ export class PaginationType {
 export class Category {
     id?: number;
     text: string;
-    no: string;
+    slug: string;
     checked: boolean;
 
     constructor() {
         this.id = 0;
         this.text = '';
-        this.no = '';
+        this.slug = '';
         this.checked = false;
     }
 }
 
 export class Post {
     id: number;
+    slug: string;
     type: ContentType;
     title: string;
     abstract: string;
@@ -170,6 +171,7 @@ export class Post {
 
     constructor() {
         this.id = 0;
+        this.slug = '';
         this.type = ContentType.POST;
         this.title = '';
         this.abstract= '';

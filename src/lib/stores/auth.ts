@@ -1,99 +1,311 @@
-import { writable } from 'svelte/store';
-import { User, UserRole } from '$lib/model';
-import { browser } from '$app/environment';
-import { isLoggedIn, getAccessToken, getRefreshToken } from 'axios-jwt';
+import { writable, get } from 'svelte/store';
+import { User } from '$lib/model';
 import { goto } from '$app/navigation';
 import { page } from '$app/stores';
-import { get } from 'svelte/store';
-import { requestRefresh, getCurrentUser } from '$lib/api';
+import {
+    isLoggedIn,
+    setAuthTokens,
+    clearAuthTokens,
+    getAccessToken,
+    getRefreshToken,
+    type TokenRefreshRequest, type IAuthTokens, getBrowserLocalStorage, applyAuthTokenInterceptor
+} from 'axios-jwt';
+import { browser } from "$app/environment";
+import {  requestCurrentUser } from '$lib/api';
+import axios from "axios";
 
-// 用户信息存储
+export const BASE_URL = "http://localhost:8000/api/v1";
+
+// 用户信息和认证状态存储
 export const currentUser = writable<User | null>(null);
-export const isAuthenticated = writable<boolean>(false);
 
-// 处理认证错误的辅助函数
+// Token 过期前的刷新时间（5分钟）
+const TOKEN_REFRESH_THRESHOLD = 300;
+
+// 1. Create an axios instance that you wish to apply the interceptor to
+export const axiosInstance = axios.create({
+    baseURL: BASE_URL,
+    // Ensure we can read the auth headers
+    headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+    }
+});
+
+// Add response interceptor to handle 401 errors globally
+axiosInstance.interceptors.response.use(
+    (response) => {
+        // Log successful token-related responses in development
+        if (import.meta.env.DEV && response.config.url?.includes('/auth/')) {
+            console.debug('Auth response headers:', response.headers);
+        }
+        return response;
+    },
+    async (error) => {
+        if (error.response?.status === 401) {
+            console.error("拦截到未授权请求，重定向到登录界面");
+            // Don't call logout here to avoid infinite loop
+            // await clearAuthTokens();
+            // currentUser.set(null);
+            if (browser) {
+                await goto("/login");
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
+// 2. Define token refresh function.
+export const requestRefresh: TokenRefreshRequest = async (
+    refreshToken: string,
+): Promise<IAuthTokens | string> => {
+    if (import.meta.env.DEV) {
+        console.debug('Token refresh triggered with token:', refreshToken?.slice(0, 10) + '...');
+    }
+
+    try {
+        // Important! Do NOT use the axios instance that you supplied to applyAuthTokenInterceptor
+        // because this will result in an infinite loop when trying to refresh the token.
+        const response = await axios.post(
+            `${BASE_URL}/auth/refresh`,
+            {},
+            {
+                headers: {
+                    "X-Refresh-Token": refreshToken,
+                },
+            },
+        );
+
+        // Get tokens from response headers with exact case
+        const accessToken = response.headers["authorization"];
+        const newRefreshToken = response.headers["x-refresh-token"];
+
+        if (response.status === 200 && accessToken) {
+            if (import.meta.env.DEV) {
+                console.debug('Token refresh successful:', {
+                    hasAccessToken: !!accessToken,
+                    hasRefreshToken: !!newRefreshToken,
+                    accessTokenLength: accessToken.length,
+                    refreshTokenLength: newRefreshToken?.length || 0,
+                    headers: response.headers
+                });
+            }
+
+            return {
+                accessToken: accessToken,
+                refreshToken: newRefreshToken || refreshToken,
+            };
+        } else {
+            console.error("Token refresh failed: Missing tokens in response headers", {
+                status: response.status,
+                headers: response.headers,
+                accessToken: !!accessToken,
+                refreshToken: !!newRefreshToken
+            });
+            throw new Error("Token refresh failed");
+        }
+    } catch (error) {
+        console.error("Token refresh failed:", error);
+        try {
+            await clearAuthTokens();
+            if (browser) {
+                await goto("/login");
+            }
+        } catch (cleanupError) {
+            console.error("Error during cleanup:", cleanupError);
+        }
+        throw error;
+    }
+};
+
+// 3. Add interceptor to your axios instance with storage configuration
+
+if (browser) {
+    const getStorage = getBrowserLocalStorage
+
+    // Configure axios-jwt with proper storage
+    applyAuthTokenInterceptor(axiosInstance, {
+        requestRefresh,
+        headerPrefix: "",
+        header: "Authorization",  // Use exact header case
+        getStorage: getStorage         // explicitly pass the storage
+    });
+}
+
+// 解析 JWT Token
+function parseJwtToken(token: string) {
+    try {
+        const [, payload] = token.split('.');
+        return JSON.parse(atob(payload));
+    } catch (error) {
+        console.error('[Auth] Failed to parse JWT token:', error);
+        return null;
+    }
+}
+
+// 处理认证错误
 async function handleAuthError() {
     currentUser.set(null);
-    isAuthenticated.set(false);
+    if (browser) {
+        // clearAuthTokens();
+    }
+}
+
+// 检查并刷新 Token
+async function checkAndRefreshToken() {
+    console.log("[Auth] 检查并刷新 Token...")
+    try {
+        const accessToken = await getAccessToken();
+        if (!accessToken) return false;
+
+        const payload = parseJwtToken(accessToken);
+        if (!payload) return false;
+
+        const now = Math.floor(Date.now() / 1000);
+        if (payload.exp - now < TOKEN_REFRESH_THRESHOLD) {
+            console.log("[Auth] Token将在5分钟内过期")
+            const refreshToken = await getRefreshToken();
+            if (!refreshToken) return false;
+
+            await requestRefresh(refreshToken);
+            return true;
+        }
+        return true;
+    } catch (error) {
+        console.error('[Auth] Token refresh failed:', error);
+        return false;
+    }
 }
 
 // 更新认证状态和用户信息
-export async function updateAuthState(forceRedirect: boolean = false) {
+export async function updateAuthState() {
     try {
-        // 检查登录状态
-        const loggedIn = await isLoggedIn();
-        console.debug('[Auth] 登录状态检查:', loggedIn);
-        isAuthenticated.set(loggedIn);
-
-        // 获取当前路径
-        let currentPath = '/';
-        if (browser) {
-            const currentPage = get(page);
-            currentPath = currentPage?.url?.pathname || window.location.pathname;
+        if (get(currentUser) == null) {
+            console.log("[Auth] currentUser is null")
         }
-        console.debug('[Auth] 当前路径:', currentPath);
 
-        if (loggedIn) {
-            // 已登录：检查 token 是否即将过期
-            const accessToken = await getAccessToken();
-            if (accessToken) {
-                const jwtParts = accessToken.split('.');
-                const payload = JSON.parse(atob(jwtParts[1]));
-                const exp = payload.exp;
-                const now = Math.floor(Date.now() / 1000);
-                if (exp - now < 300) { // token 将在5分钟内过期
-                    console.warn("[Auth] Access token 即将过期");
-                    const refreshToken = await getRefreshToken();
-                    if (refreshToken) {
-                        try {
-                            console.debug("[Auth] 正在尝试刷新 token");
-                            await requestRefresh(refreshToken);
-                            console.debug("[Auth] Token 刷新成功");
-                        } catch (error) {
-                            console.error("[Auth] Token 刷新失败:", error);
-                        }
-                    } else {
-                        console.warn("[Auth] 没有可用的 refresh token");
-                    }
-                }
-            }
-
-            // 获取用户信息
-            try {
-                const user = await getCurrentUser();
-                console.debug('[Auth] 已获取用户信息:', user);
-                currentUser.set(user);
-
-                // 只在登录页面时重定向到管理后台
-                const isLoginPage = currentPath.includes('/login');
-                if (isLoginPage) {
-                    console.debug('[Auth] 在登录页面检测到已登录状态，重定向到管理后台');
-                    await goto('/admin');
-                }
-                return;
-            } catch (error) {
-                console.error('[Auth] 获取用户信息失败:', error);
-                await handleAuthError();
-            }
-        } else {
-            // 未登录：清除用户信息并处理重定向
+        // 检查并刷新 token
+        const tokenValid = await checkAndRefreshToken();
+        if (!tokenValid) {
             await handleAuthError();
-            // 在非登录页面时重定向到登录页面
-            const isLoginPage = currentPath.includes('/login');
-            if (browser && !isLoginPage) {
-                console.debug('[Auth] 在非登录页面检测到未登录状态，重定向到登录页面');
-                await goto('/login');
-            }
+            return;
+        } else {
+            console.debug("[Auth] Token有效")
+        }
+
+        // 获取用户信息
+        try {
+            const user = await requestCurrentUser();
+            currentUser.set(user);
+        } catch (error) {
+            console.error('[Auth] 请求用户信息失败：', error);
+            await handleAuthError();
         }
     } catch (error) {
-        console.error('[Auth] 更新用户 token 时出错:', error);
+        console.error('[Auth] Failed to update auth state:', error);
         await handleAuthError();
     }
 }
 
-// 在浏览器环境下初始化用户状态
-if (browser) {
-    console.debug('[Auth] 正在浏览器环境中初始化用户状态');
-    // 初始化时不强制重定向
-    updateAuthState(false);
+// 登录
+export async function login(username: string, password: string) {
+    try {
+        const response = await axios.post(`${BASE_URL}/auth/login/${username}`, {
+            username,
+            password,
+        });
+
+        if (response.status === 200) {
+            const accessToken = response.headers["authorization"];
+            const refreshToken = response.headers["x-refresh-token"];
+
+            if (accessToken && refreshToken) {
+                // First set the tokens
+                await setAuthTokens({
+                    accessToken,
+                    refreshToken,
+                });
+
+                // Then try to get user info
+                try {
+                    const user = await requestCurrentUser();
+                    currentUser.set(user);
+                    return { success: true };
+                } catch (error) {
+                    console.error("Failed to get user info after login:", error);
+                    // Clear tokens if we can't get user info
+                    await clearAuthTokens();
+                    currentUser.set(null);
+                    return { success: false, message: "登录成功但获取用户信息失败" };
+                }
+            }
+        }
+        return { success: false, message: "登录失败" };
+    } catch (error: unknown) {
+        console.error("Login failed:", error);
+        let errorMessage = "登录失败，请稍后重试";
+        if (error && typeof error === 'object' && 'response' in error) {
+            const axiosError = error as { response?: { data?: { message?: string } } };
+            errorMessage = axiosError.response?.data?.message || errorMessage;
+        }
+        return { 
+            success: false, 
+            message: errorMessage 
+        };
+    }
+}
+
+// 检查登录状态
+export async function checkLoginStatus() {
+    if (!browser) return false;
+
+    try {
+        const loggedIn = await isLoggedIn();
+        if (!loggedIn) return false;
+
+        const accessToken = await getAccessToken();
+        if (!accessToken) return false;
+
+        const payload = parseJwtToken(accessToken);
+        if (!payload) return false;
+
+        const now = Math.floor(Date.now() / 1000);
+        return payload.exp > now;
+    } catch (error) {
+        console.error('[Auth] Failed to check login status:', error);
+        return false;
+    }
+}
+
+// 登出
+export async function logout() {
+    try {
+        const refreshToken = await getRefreshToken();
+        if (refreshToken) {
+            // 调用后端注销 token
+            await axios.post(`${BASE_URL}/auth/logout`, {}, {
+                headers: {
+                    "Refresh-Token": refreshToken
+                }
+            });
+        }
+    } catch (error) {
+        console.error("Logout error:", error);
+        // Continue with cleanup even if the server logout fails
+    } finally {
+        try {
+            // 清除本地 token
+            await clearAuthTokens();
+            // 清除用户信息
+            currentUser.set(null);
+            if (browser) {
+                await goto("/login");
+            }
+        } catch (error) {
+            console.error("Error during cleanup:", error);
+            if (browser) {
+                await goto("/login");
+            }
+        }
+    }
 }
