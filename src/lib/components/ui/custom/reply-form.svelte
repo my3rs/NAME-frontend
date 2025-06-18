@@ -4,7 +4,7 @@
     import {isLoggedIn} from "axios-jwt";
     import {axiosInstance} from "$lib/api";
     import {API_URL} from "$lib/params/base";
-    import {getUser} from "$lib/login";
+    import {getUser} from "$lib/stores/auth";
     import {onMount} from "svelte";
 
     export let parentID: number

@@ -24,11 +24,12 @@
     import { Toaster } from "$lib/components/ui/sonner";
     import { toast } from "svelte-sonner";
     import { deletePosts } from "$lib/api";
-    import DataTable from "./data-table.svelte";
+    import DataTable from "$lib/components/ui/custom/table.svelte";
     import { columns } from "./columns";
     import { posts } from "$lib/stores/posts";
     import type { PaginationState } from "@tanstack/table-core";
     import { on } from "svelte/events";
+    import SidebarInfo from "$lib/components/sidebar-info.svelte";
     
 
     export let data : PageData;
@@ -99,51 +100,50 @@
     }
 </script>
 
+<div class="flex flex-1">
+    <div class="flex-1">
+        <header
+            class="flex h-16 shrink-0 items-center gap-2"
+        >
+            <div class="flex items-center gap-2 px-4">
+                <Sidebar.Trigger class="-ml-1" />
+                <Separator orientation="vertical" class="mr-2 h-4" />
+                <Breadcrumb.Root>
+                    <Breadcrumb.List>
+                        <Breadcrumb.Item class="hidden md:block">
+                            <Breadcrumb.Link href="/admin">控制台</Breadcrumb.Link>
+                        </Breadcrumb.Item>
+                        <Breadcrumb.Separator class="hidden md:block" />
 
-<header
-    class="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12"
->
-    <div class="flex items-center gap-2 px-4">
-        <Sidebar.Trigger class="-ml-1" />
-        <Separator orientation="vertical" class="mr-2 h-4" />
-        <Breadcrumb.Root>
-            <Breadcrumb.List>
-                <Breadcrumb.Item class="hidden md:block">
-                    <Breadcrumb.Link href="/admin">控制台</Breadcrumb.Link>
-                </Breadcrumb.Item>
-                <Breadcrumb.Separator class="hidden md:block" />
+                        <Breadcrumb.Item class="hidden md:block">
+                            <Breadcrumb.Page>文章</Breadcrumb.Page>
+                        </Breadcrumb.Item>
+                    </Breadcrumb.List>
+                </Breadcrumb.Root>
+            </div>
+        </header>
 
-                <Breadcrumb.Item class="hidden md:block">
-                    <Breadcrumb.Page>文章</Breadcrumb.Page>
-                </Breadcrumb.Item>
-                
-            </Breadcrumb.List>
-        </Breadcrumb.Root>
+        <div class="p-6">
+            <!-- 工具栏 BEGIN -->
+            <div class="flex items-center p-4 mb-4 bg-gray-50 rounded space-x-4">
+                <Button href="/admin/posts/new" target="_blank">
+                    <Pen class="mr-2 h-4 w-4" size={32} />
+                    撰写文章
+                </Button>
+            </div>
+            <!-- 工具栏 END -->
+
+            <div class="w-full overflow-x-auto">
+                    <DataTable 
+                        data={currentPosts}
+                        columns={columns}
+                        pagination={pagination}
+                        on:paginationChange={handlePaginationChange}
+                        on:deleteSuccess={handleDeleteSuccess}
+                    />
+            </div>
+        </div>
     </div>
-</header>
 
-<main class="flex-1 p-6 overflow-y-auto h-screen">
-    <!-- 工具栏 BEGIN -->
-    <div class="flex items-center p-4 mb-4 bg-gray-50 rounded space-x-4">
-        <Button href="/admin/posts/new" target="_blank">
-            <Pen class="mr-2 h-4 w-4" size={32} />
-            撰写文章
-        </Button>
-    </div>
-    <!-- 工具栏 END -->
-
-
-    <div class="w-full overflow-x-auto">
-        {#if currentPosts.length > 0}
-            <DataTable 
-                data={currentPosts}
-                columns={columns}
-                pagination={pagination}
-                on:paginationChange={handlePaginationChange}
-                on:deleteSuccess={handleDeleteSuccess}
-            />
-        {/if}
-    </div>
-
-
-</main>
+    <SidebarInfo />
+</div>

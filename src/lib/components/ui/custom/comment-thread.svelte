@@ -2,8 +2,8 @@
     import { browser } from "$app/environment";
     import type {Comment} from "$lib/model";
     import {sha256}  from "js-sha256";
-    import { axiosInstance } from "$lib/api";
-    import {username, userrole, userid, getUser, getUserName} from "$lib/login";
+    import { axiosInstance } from "$lib/stores/auth";
+    import { getUser } from "$lib/stores/auth";
     import {API_URL} from "$lib/params/base";
     import {isLoggedIn} from "axios-jwt";
     import { ReplyForm } from "$lib/components/ui/custom";
@@ -40,7 +40,6 @@
     const handleReplySubmit = async (parentID: number) => {
         if (await isLoggedIn()) {
 
-
             axiosInstance.post(API_URL + '/comments', {
                 contentID: contentID,
                 authorID: userid,
@@ -70,8 +69,8 @@
             else {
                 response = await axiosInstance.post(API_URL + '/comments', {
                     contentID: contentID,
-                    authorName: user.name,
-                    mail: user.mail,
+                    authorName: user.username,
+                    mail: user.email,
                     url: user.url,
                     text: replyText,
                     parentID: parentID,

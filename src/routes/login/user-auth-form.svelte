@@ -5,7 +5,7 @@
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Label } from "$lib/components/ui/label/index.js";
 	import { cn } from "$lib/utils.js";
-    import { login } from "$lib/login";
+    import { login } from "$lib/stores/auth";
     import { goto } from "$app/navigation";
 
 	let className: string | undefined | null = undefined;
@@ -15,23 +15,27 @@
 	let password = "";
 
 	let isLoading = false;
+	let errorMessage = "";
+
 	async function onSubmit() {
 		isLoading = true;
+		errorMessage = "";
 
-		await login(username, password)
-			.then((response) => {
-				if (response.data.success) {
-					console.log("登录成功");
-					isLoading = false;
-					goto("/admin");
-				}
-			})
-			.catch((error) => {
-				console.log("登录失败");
-				console.log(error);
-				isLoading = false;
-			});
-
+		try {
+			const result = await login(username, password);
+			if (result.success) {
+				console.log("登录成功");
+				goto("/admin");
+			} else {
+				errorMessage = result.message || "登录失败：" + result.message;
+				console.error("登录失败:", result.message);
+			}
+		} catch (error) {
+			errorMessage = "登录时发生错误，请稍后重试";
+			console.error("登录错误:", error);
+		} finally {
+			isLoading = false;
+		}
 	}
 </script>
 
@@ -68,6 +72,9 @@
 				{/if}
 				登录
 			</Button>
+			{#if errorMessage}
+				<div class="text-sm text-red-500 mt-2">{errorMessage}</div>
+			{/if}
 		</div>
 	</form>
 	<div class="relative">

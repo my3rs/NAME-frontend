@@ -13,7 +13,7 @@
     import { isLoggedIn, getAccessToken, getRefreshToken } from 'axios-jwt';
     import { browser } from "$app/environment";
     import { tokenStorage } from "$lib/api";
-    import { currentUser, isAuthenticated, updateUserFromToken } from "$lib/stores/auth";
+    import { currentUser, isAuthenticated, updateAuthState } from "$lib/stores/auth";
 
     let accessToken = '未设置';
     let refreshToken = '未设置';
@@ -157,7 +157,7 @@
 
     onMount(async () => {
         mounted = true;
-        await updateUserFromToken();
+        await updateAuthState();
         console.debug('Debug page mounted, current user:', $currentUser);
         console.debug('Authentication state:', $isAuthenticated);
         await updateTokenInfo();

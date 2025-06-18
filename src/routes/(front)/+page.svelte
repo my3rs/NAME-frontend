@@ -9,7 +9,6 @@
     import ChevronLeft from "lucide-svelte/icons/chevrons-left";
     import Message from "lucide-svelte/icons/message-square-more";
     import * as Pagination from "$lib/components/ui/pagination/index.js";
-    import { mediaQuery } from "svelte-legos";
     import { API_URL } from "$lib/params/base";
     import axios from "axios";
     import type { Category } from "$lib/model";
@@ -19,18 +18,13 @@
     let pagination = data.pagination;
 
     // 翻页
-    // const isDesktop = mediaQuery("(min-width: 768px)");
-    const isDesktop = true;
-
     let count = pagination.itemsCount;
     let perPage = pagination.pageSize;
-    // let siblingCount = $isDesktop ? 1 : 0;
     let siblingCount = 1;
 
     function updatePaginationData() {
         count = pagination.itemsCount;
         perPage = pagination.pageSize;
-        // siblingCount = $isDesktop ? 1 : 0;
         siblingCount = 1;
     }
 
@@ -148,45 +142,30 @@
     </div>
 
     <div class="flex mt-6">
-        <Pagination.Root
-            {count}
-            {perPage}
-            {siblingCount}
-            let:pages
-            let:currentPage
-            {onPageChange}
-            class="items-center"
-        >
-            <Pagination.Content>
-                <Pagination.Item>
-                    <Pagination.PrevButton>
-                        <ChevronLeft class="h-4 w-4" />
-                        <span class="hidden sm:block">上一页</span>
-                    </Pagination.PrevButton>
-                </Pagination.Item>
-                {#each pages as page (page.key)}
+        <Pagination.Root {count} {perPage} {siblingCount}>
+            {#snippet children({ pages, currentPage })}
+                <Pagination.Content>
+                    <Pagination.Item>
+                    <Pagination.PrevButton />
+                    </Pagination.Item>
+                    {#each pages as page (page.key)}
                     {#if page.type === "ellipsis"}
                         <Pagination.Item>
-                            <Pagination.Ellipsis />
+                        <Pagination.Ellipsis />
                         </Pagination.Item>
                     {:else}
-                        <Pagination.Item>
-                            <Pagination.Link
-                                {page}
-                                isActive={currentPage === page.value}
-                            >
-                                {page.value}
-                            </Pagination.Link>
+                        <Pagination.Item isVisible={currentPage === page.value}>
+                        <Pagination.Link {page} isActive={currentPage === page.value}>
+                            {page.value}
+                        </Pagination.Link>
                         </Pagination.Item>
                     {/if}
-                {/each}
-                <Pagination.Item>
-                    <Pagination.NextButton>
-                        <span class="hidden sm:block">下一页</span>
-                        <ChevronRight class="h-4 w-4" />
-                    </Pagination.NextButton>
-                </Pagination.Item>
-            </Pagination.Content>
+                    {/each}
+                    <Pagination.Item>
+                    <Pagination.NextButton />
+                    </Pagination.Item>
+                </Pagination.Content>
+            {/snippet}
         </Pagination.Root>
     </div>
 </main>
@@ -202,7 +181,7 @@
         {#if categories && categories.length > 0}
             <ul class="my-4 ml-6 list-disc [&>li]:mt-2 text-gray-600">
                 {#each categories as category}
-                    <li>{category.title}</li>
+                    <li>{category.text}</li>
                 {/each}
             </ul>
         {/if}

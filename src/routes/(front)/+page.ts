@@ -14,11 +14,11 @@ export const load: PageLoad = async () => {
 
         if (rsp.data.success) {
             if (DEBUG) {
-                console.log("预加载数据成功.", rsp.data.pagination.itemsCount);
+                console.log("预加载数据成功.", rsp.data.page.total);
             }
             return {
-                posts: rsp.data.items,
-                pagination: rsp.data.pagination,
+                posts: rsp.data.data,
+                pagination: rsp.data.page,
             };
         } else {
             console.log("Failed to get posts from backend.");

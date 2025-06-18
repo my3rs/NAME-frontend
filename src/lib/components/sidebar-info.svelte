@@ -1,61 +1,64 @@
 <script lang="ts">
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-    import DatePicker from "$lib/components/sidebar-datepicker.svelte";
 	import Plus from "lucide-svelte/icons/plus";
 	import type { ComponentProps } from "svelte";
     import axios from "axios";
     import {API_URL} from "$lib/params/base";
+	import { Label } from "$lib/components/ui/label/index.js";
+
 
     let meta = axios.get(API_URL + "/meta");
 
-	// This is sample data.
-	const data = {
-		user: {
-			name: "shadcn",
-			email: "m@example.com",
-			avatar: "/avatars/shadcn.jpg",
-		},
-		calendars: [
-			{
-				name: "My Calendars",
-				items: ["Personal", "Work", "Family"],
-			},
-			{
-				name: "Favorites",
-				items: ["Holidays", "Birthdays"],
-			},
-			{
-				name: "Other",
-				items: ["Travel", "Reminders", "Deadlines"],
-			},
-		],
-	};
-
-	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
 </script>
 
-<Sidebar.Root
-	bind:ref
-	collapsible="none"
-	class="sticky top-0 hidden h-svh border-l lg:flex"
-	{...restProps}
->
-	<Sidebar.Header class="border-sidebar-border h-16 border-b">
-		<h2 class="text-lg font-semibold mb-4">博客状态</h2>
+<Sidebar.Root side="right" class="w-64 border-l">
+    <Sidebar.Header class="h-16 px-6 flex items-center border-b">
+        <h2 class="text-base font-medium">博客统计</h2>
+    </Sidebar.Header>
+
+    <Sidebar.Content class="px-6">
+        {#await meta}
+            <div class="space-y-4 py-4">
+                <div class="h-4 bg-gray-100 rounded animate-pulse"></div>
+                <div class="h-4 bg-gray-100 rounded animate-pulse"></div>
+                <div class="h-4 bg-gray-100 rounded animate-pulse"></div>
+            </div>
+        {:then rsp}
+            <div class="space-y-6 py-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <div class="text-xs text-muted-foreground">文章</div>
+                        <div class="text-base font-medium">{rsp.data.posts_count}</div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="text-xs text-muted-foreground">页面</div>
+                        <div class="text-base font-medium">{rsp.data.pages_count}</div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="text-xs text-muted-foreground">分类</div>
+                        <div class="text-base font-medium">{rsp.data.categories_count}</div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="text-xs text-muted-foreground">标签</div>
+                        <div class="text-base font-medium">{rsp.data.tags_count}</div>
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <div class="text-xs text-muted-foreground">评论</div>
+                    <div class="text-base font-medium">{rsp.data.comments_count}</div>
+                </div>
+            </div>
+        {:catch error}
+            <div class="py-4 text-red-500 text-sm">
+                加载统计信息失败
+            </div>
+        {/await}
         
-	</Sidebar.Header>
-	<Sidebar.Content>
-        <div class="mb-6 text-gray-500">
-            {#await meta}
-                共有 ... 篇文章
-            {:then rsp}
-                共有 {rsp.data.posts_count} 篇文章
-            {/await}
-        </div>
-        <DatePicker />
-		<Sidebar.Separator class="mx-0" />
-	</Sidebar.Content>
-	<Sidebar.Footer>
-		
-	</Sidebar.Footer>
+        <Sidebar.Separator class="my-6" />
+        
+    </Sidebar.Content>
+    <Sidebar.Footer>
+        
+    </Sidebar.Footer>
 </Sidebar.Root>

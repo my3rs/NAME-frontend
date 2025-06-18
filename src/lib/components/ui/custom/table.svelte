@@ -1,16 +1,7 @@
 <script lang="ts">
-    import { readable, writable, type Writable } from "svelte/store";
-    import { Post, PaginationType } from "$lib/model";
-    import {
-        getFormattedDate,
-        getFormattedDateWithoutTime,
-        getPosts,
-    } from "$lib/api";
-    import TableAction from "./table-action.svelte";
-    import DataTableCheckbox from "./data-table-checkbox.svelte";
+    import { PaginationType, Category } from "$lib/model";
     import { Button } from "$lib/components/ui/button";
     import { PAGE_SIZE } from "$lib/params/base";
-    import { posts } from "$lib/stores/posts";
     import {
         createSvelteTable,
         FlexRender,
@@ -29,7 +20,6 @@
     } from "@tanstack/table-core";
     import * as Table from "$lib/components/ui/table/index.js";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
-    import { createEventDispatcher } from "svelte";
 
     type DataTableProps<TData, TValue> = {
         data: TData[];
@@ -37,9 +27,16 @@
         pagination: PaginationType;
     };
 
-    const dispatch = createEventDispatcher();
+    let { data, columns, pagination: paginationFromServer, onDelete, onUpdate } = $props();
 
-    let { data, columns, pagination: paginationFromServer }: DataTableProps<Post, unknown> = $props();
+    // 传递回调给孙组件 table action
+    function getActionProps(category: Category) {
+        // console.log("传递回调给孙组件 table action：", category);
+        return {
+            onDelete: () => onDelete?.(category.id),
+            onUpdate: () => onUpdate?.(category),
+        }
+    }
 
     let pagination = $state<PaginationState>({
         pageIndex: paginationFromServer?.pageIndex ?? 0, 
@@ -48,11 +45,6 @@
 
     let rowSelection = $state<RowSelectionState>({});
 
-    // 处理删除成功事件
-    function handleDeleteSuccess() {
-        dispatch('deleteSuccess');
-    }
-
     const table = createSvelteTable({
         get data() {
             return data;
@@ -60,24 +52,20 @@
         get columns() {
             return columns;
         },
+        get pagination() {
+            return pagination;
+        },
+        meta: {
+            onUpdate,
+            onDelete
+        },
         state: {
-            get pagination() {
-                return pagination;
-            },
             get rowSelection() {
                 return rowSelection;
             },
         },
         enableRowSelection: true,
         enableMultiRowSelection: true,
-        onRowSelectionChange: (updater) => {
-            if (typeof updater === "function") {
-                rowSelection = updater(rowSelection);
-            } else {
-                rowSelection = updater;
-            }
-            dispatch('selectionChange', table.getSelectedRowModel().rows);
-        },
         manualPagination: true,
         pageCount: paginationFromServer?.totalPages ?? 1,
         onPaginationChange: (updater) => {
@@ -86,10 +74,7 @@
             } else {
                 pagination = updater;
             }
-            // Trigger server-side data fetch when pagination changes
-            dispatch('paginationChange', pagination);
         },
-        
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
     });
@@ -127,7 +112,7 @@
                                         <FlexRender
                                             content={cell.column.columnDef.cell}
                                             context={cell.getContext()}
-                                            on:deleteSuccess={handleDeleteSuccess}
+                                            {...getActionProps(row.original)}
                                         />
                                     {:else}
                                         <FlexRender

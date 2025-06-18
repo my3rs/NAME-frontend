@@ -1,23 +1,16 @@
 export const ssr = false;
 
 import type { PageLoad } from './$types';
+import type { AxiosError } from 'axios';
 import {API_URL, DEBUG, PAGE_SIZE} from "$lib/params/base";
-import { axiosInstance } from "$lib/api";
+import { axiosInstance } from "$lib/stores/auth";
 import { error } from "@sveltejs/kit";
-import { isAuthenticated } from "$lib/stores/auth";
 import { get } from "svelte/store";
 import { goto } from "$app/navigation";
 import { browser } from '$app/environment';
 
 export const load = (async () => {
     if (!browser) {
-        return { categories: [] };
-    }
-
-    // 检查用户是否已登录
-    if (!get(isAuthenticated)) {
-        console.debug('User is not authenticated, redirecting to login page');
-        await goto('/login');
         return { categories: [] };
     }
 
@@ -47,7 +40,8 @@ export const load = (async () => {
 
     } catch (e: unknown) {
         if (e instanceof Error) {
-            if (e.response?.status === 401) {
+            const axiosError = e as AxiosError;
+            if (axiosError.response?.status === 401) {
                 console.debug('Token expired or invalid, redirecting to login page');
                 await goto('/login');
                 return { categories: [] };

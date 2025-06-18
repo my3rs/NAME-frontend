@@ -1,6 +1,6 @@
 import type { PageLoad } from './$types';
 import {API_URL, DEBUG, PAGE_SIZE} from "$lib/params/base";
-import {axiosInstance} from "$lib/api";
+import {axiosInstance} from "$lib/stores/auth";
 import {error} from "@sveltejs/kit";
 
 export const ssr = false;

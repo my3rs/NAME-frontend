@@ -1,9 +1,13 @@
 <script lang="ts">
     import {onMount} from "svelte";
-    import {axiosInstance, getFormattedDate, getPosts, getTags, crateTag} from "$lib/api";
+    import { getFormattedDate, getPosts, getTags, createTag} from "$lib/api";
+    import { axiosInstance } from '$lib/stores/auth';
     import Svelecte from 'svelecte';
     import * as Dialog from "$lib/components/ui/dialog/index.js";
     import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+    import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+    import { Separator } from "$lib/components/ui/separator/index.js";
+    import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
     // 动画
     import { slide,fade } from 'svelte/transition';
 
@@ -64,12 +68,12 @@
     // 创建标签
     let newTag : Tag = new Tag();
     $: titleError = !newTag.text && !editTag.text;
-    $: slugError = !newTag.no && !editTag.no;
+    $: slugError = !newTag.slug && !editTag.slug;
     $: errorMessage = titleError || slugError ? '请填写所有必填字段*' : '';
 
     function onNewTagSubmit() {
         if (errorMessage.length == 0 || errorMessage === '') {
-            postTag(newTag)
+            createTag(newTag)
                 .then(rsp => {
                     if (rsp.data.success) {
                         toast.success("创建成功！", {
@@ -191,11 +195,30 @@
 
 </script>
 
+<header
+    class="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12"
+>
+    <div class="flex items-center gap-2 px-4">
+        <Sidebar.Trigger class="-ml-1" />
+        <Separator orientation="vertical" class="mr-2 h-4" />
+        <Breadcrumb.Root>
+            <Breadcrumb.List>
+                <Breadcrumb.Item class="hidden md:block">
+                    <Breadcrumb.Link href="/admin">控制台</Breadcrumb.Link>
+                </Breadcrumb.Item>
+                <Breadcrumb.Separator class="hidden md:block" />
+
+                <Breadcrumb.Item class="hidden md:block">
+                    <Breadcrumb.Page>标签</Breadcrumb.Page>
+                </Breadcrumb.Item>
+                
+            </Breadcrumb.List>
+        </Breadcrumb.Root>
+    </div>
+</header>
 
 <main class="flex-1 p-6 overflow-y-auto h-screen">
-    <div class="mb-6">
-        <h1 class="text-2xl font-semibold">标签</h1>
-    </div>
+    
 
     <!-- 工具栏 -->
     <div class="flex items-center p-4 mb-4 bg-gray-50 rounded space-x-4">
@@ -225,29 +248,14 @@
                     </div>
                     <div class="grid grid-cols-4 items-center gap-4">
                         <Label for="username" class="text-right">缩略名*</Label>
-                        <Input id="username" bind:value={newTag.no} class="col-span-3" />
+                        <Input id="username" bind:value={newTag.slug} class="col-span-3" />
                     </div>
 
-                    <div class="grid grid-cols-4 items-center gap-4">
-                        <Label for="name" class="text-right">
-                            父标签
-                        </Label>
-                        <div class="z-50 col-span-3">
-                            <Svelecte
-                                    options={tags}
-                                    name="parent-tag"
-                                    bind:value={parentTag}
-                                    clearable
-                                    labelField="text"
-                                    valueField="no"
-                            />
-                        </div>
-
-                    </div>
+                    
                 </div>
                 <Dialog.Footer>
                     <Dialog.Close>
-                        <Button on:click={onNewTagSubmit}>创建</Button>
+                        <Button onclick={onNewTagSubmit}>创建</Button>
                     </Dialog.Close>
 
                 </Dialog.Footer>
@@ -292,9 +300,8 @@
                 <tr class="text-xs font-semibold tracking-wide text-left text-gray-500 uppercase bg-gray-50 border-b">
                     <th class="px-4 py-3 w-1"></th>
                     <th class="px-4 py-3">ID</th>
-                    <th class="px-4 py-3">缩写</th>
+                    <th class="px-4 py-3">缩略名</th>
                     <th class="px-4 py-3">名称</th>
-                    <th class="px-4 py-3">标签层级</th>
                     <th class="px-4 py-3">操作</th>
                 </tr>
                 </thead>
@@ -322,23 +329,11 @@
                         <td class="px-4 py-2">
                             <div class="flex items-center text-sm">
                                 <div>
-                                    <p class="font-semibold">{tag.no}</p>
+                                    <p class="font-semibold">{tag.slug}</p>
                                 </div>
                             </div>
                         </td>
-                        <td class="px-4 py-2 text-sm">{tag.readablePath}</td>
-
-                        <td class="px-4 py-2 text-sm">
-                            {#if tag.depth === 1}
-                                1
-                            {:else if tag.depth === 2}
-                                2
-                            {:else if tag.depth === 3}
-                                3
-                            {:else if tag.depth === 4}
-                                4
-                            {/if}
-                        </td>
+                        <td class="px-4 py-2 text-sm">{tag.text}</td>
 
                         <td class="px-4 py-2 text-sm">
                             <div class="flex items-center space-x-4 text-sm">
@@ -365,31 +360,6 @@
 
 </main>
 
-<aside class="w-64 p-6 bg-gray-50 border-l border-gray-100 h-screen overflow-y-auto">
-    <h2 class="text-lg font-semibold mb-4">附加信息</h2>
-    <div class="mb-6 text-gray-500">
-        {#await meta}
-            共有 ... 个标签
-        {:then rsp}
-            共有 {rsp.data.tags_count} 个标签
-        {/await}
-    </div>
-
-    <div class="mb-6">
-        <h3 class="text-md font-medium mb-2">博客状态</h3>
-        <!-- Add blog status content here -->
-    </div>
-    <div class="mb-6">
-        <h3 class="text-md font-medium mb-2">最新评论</h3>
-        <!-- Add latest comments content here -->
-    </div>
-    <!-- Add more sections as needed -->
-</aside>
-
-
-
-
-
 
 <!-- 修改标签的Modal -->
 {#if showEditTagModal}
@@ -408,19 +378,7 @@
                             </h3>
 
                             <div class="mt-2">
-                                <div class="z-50 mb-2">
-                                    <Svelecte
-                                            options={tags}
-                                            name="parent-tag"
-                                            bind:value={parentTag}
-                                            clearable
-                                            placeholder="父标签（可选）"
-                                            labelField="text"
-                                            valueField="no"
-                                    />
-                                </div>
-
-                                <input bind:value={editTag.no} type="text" class="w-full px-2 py-1 border border-gray-300 rounded mb-2" placeholder="标签缩略名">
+                                <input bind:value={editTag.slug} type="text" class="w-full px-2 py-1 border border-gray-300 rounded mb-2" placeholder="标签缩略名">
                                 <input bind:value={editTag.text} class="w-full px-2 py-1 border border-gray-300 rounded" placeholder="标签名称">
 
 

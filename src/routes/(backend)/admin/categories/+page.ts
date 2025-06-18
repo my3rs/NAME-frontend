@@ -19,14 +19,14 @@ export const load = (async ({ params  }) => {
         if (rsp.data.success) {
             if (DEBUG) {
                 console.log("预加载数据成功：", {
-                    items: rsp.data.items,
-                    pagination: rsp.data.pagination
+                    data: rsp.data.data,
+                    page: rsp.data.page
                 })
             }
 
             return {
-                items: rsp.data.items,
-                pagination: rsp.data.pagination
+                data: rsp.data.data,
+                page: rsp.data.page
             };
         } else {
             throw error(404, "not found")

@@ -9,8 +9,8 @@
     import Settings from "lucide-svelte/icons/settings";
     import { page } from '$app/stores';
     import { currentUser } from "$lib/stores/auth";
-    import { logout } from "$lib/api";
     import { UserRole } from "$lib/model";
+
 
     // Menu items.
     const items = [
@@ -46,38 +46,48 @@
         }
     ];
 
-    let currentPath = $page.url.pathname;
+    let currentPath: string;
     $: currentPath = $page.url.pathname;
 
+    $: isMenuItemActive = (itemUrl: string) => {
+        // For exact match of root admin path
+        if (itemUrl === '/admin' && currentPath === '/admin') {
+            return true;
+        }
+        // For other paths, check if current path starts with menu item URL
+        return itemUrl !== '/admin' && currentPath.startsWith(itemUrl);
+    };
+
     async function handleLogout() {
-        await logout();
+        
     }
 </script>
 
-<Sidebar.Root>
+<Sidebar.Root side="left">
     <Sidebar.Header />
+
     <Sidebar.Content>
-        <Sidebar.Group />
-            <Sidebar.GroupLabel>常用</Sidebar.GroupLabel>
+        <Sidebar.Group>
+        
             <Sidebar.GroupContent>
-            <Sidebar.Menu>
-                {#each items as item (item.title)}
-                    <Sidebar.MenuItem>
-                        <Sidebar.MenuButton isActive={item.url === $page.url.pathname}>
-                        {#snippet child({ props })}
+                <Sidebar.Menu>
+                    {#each items as item (item.title)}
+                        <Sidebar.MenuItem>
+                        <Sidebar.MenuButton isActive={isMenuItemActive(item.url)}>
+                            {#snippet child({ props })}
                             <a href={item.url} {...props}>
-                            <item.icon />
-                            <span>{item.title}</span>
+                                <item.icon />
+                                <span>{item.title}</span>
                             </a>
-                        {/snippet}
+                            {/snippet}
                         </Sidebar.MenuButton>
-                    </Sidebar.MenuItem>
-                {/each}
-            </Sidebar.Menu>
+                        </Sidebar.MenuItem>
+                    {/each}
+                </Sidebar.Menu>
             </Sidebar.GroupContent>
-        <Sidebar.Group />
+        </Sidebar.Group>
     </Sidebar.Content>
     <Sidebar.Footer>
-        <NavUser user={$currentUser} />
+        <NavUser bind:user={$currentUser} />
     </Sidebar.Footer>
 </Sidebar.Root>
