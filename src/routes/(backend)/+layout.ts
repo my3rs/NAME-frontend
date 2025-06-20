@@ -1,16 +1,15 @@
 import type { LayoutLoad } from './$types';
-import {currentUser, updateAuthState} from '$lib/stores/auth';
-import { get } from 'svelte/store';
-import { goto } from '$app/navigation';
+import { requireAuth } from '$lib/services/auth';
 
 export const ssr = false;
 
 export const load: LayoutLoad = async ({ url }) => {
-    await updateAuthState();
-    let user = get(currentUser);
-    if (user == null) {
-        console.log("[Layout] 未登录，重定向...")
-        goto("/login");
+    // 使用新的认证检查
+    const authenticated = await requireAuth();
+    
+    if (!authenticated) {
+        console.log("[Layout] 认证失败，重定向到登录页");
+        return {};
     }
 
     return {};

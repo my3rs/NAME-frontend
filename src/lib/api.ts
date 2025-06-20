@@ -1,29 +1,60 @@
-import { API_URL } from "$lib/params/base";
+// 兼容性API层 - 保持向后兼容的同时使用新的服务架构
+// 这个文件作为过渡层，让现有代码可以继续工作，同时新代码可以使用新的服务
+
 import { Category, type Post, type Tag } from "$lib/model";
-import {
-    getAccessToken,
-} from "axios-jwt";
-import { axiosInstance } from "$lib/stores/auth";
 import { User } from "$lib/model";
-import { currentUser } from './stores/auth';
+import { api, formatDate as newFormatDate, formatDateWithoutTime as newFormatDateWithoutTime } from "$lib/services/api";
+import { httpClient } from "$lib/services/http";
+import { API_BASE_URL } from "$lib/config";
 
-export const BASE_URL = "http://localhost:8000/api/v1";
+// 导出新的HTTP客户端作为axiosInstance以保持兼容性
+export const axiosInstance = httpClient;
+export const BASE_URL = API_BASE_URL;
 
+// 兼容性token存储
+export const tokenStorage = {
+    getItem: (key: string) => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem(key);
+        }
+        return null;
+    },
+    setItem: (key: string, value: string) => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(key, value);
+        }
+    },
+    removeItem: (key: string) => {
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem(key);
+        }
+    }
+};
+
+// 向后兼容的API函数
 export const getPostByID = (id: number | string, params?: string) => {
-    return axiosInstance.get(API_URL + "/posts/" + id + "?" + params);
+    const url = `/posts/${id}${params ? `?${params}` : ''}`;
+    return httpClient.get(url);
 };
 
 export const getPosts = async (
     pageIndex: number | string,
     pageSize: number | string,
 ) => {
-    return axiosInstance.get(API_URL + "/posts", {
-        params: {
-            pageIndex: pageIndex,
-            pageSize: pageSize,
-            orderBy: "created_at desc",
-        },
-    });
+    try {
+        const result = await api.posts.getPosts({
+            pageIndex: Number(pageIndex),
+            pageSize: Number(pageSize),
+        });
+        
+        // 转换新格式到旧格式以保持兼容性
+        return {
+            data: result,
+            status: 200,
+        };
+    } catch (error) {
+        throw error;
+    }
 };
 
 export const getComments = async (
@@ -31,146 +62,162 @@ export const getComments = async (
     pageSize: number | string,
     params?: Object,
 ) => {
-    return axiosInstance.get(API_URL + "/comments/", {
-        params: Object.assign(
-            {
-            pageIndex: pageIndex,
-            pageSize: pageSize,
-            orderBy: "created_at desc",
-            },
-            params,
-        ),
-    });
+    try {
+        const result = await api.comments.getComments({
+            pageIndex: Number(pageIndex),
+            pageSize: Number(pageSize),
+            ...(params || {}),
+        });
+        
+        return {
+            data: result,
+            status: 200,
+        };
+    } catch (error) {
+        throw error;
+    }
 };
 
 export const deleteBatchComments = async (ids: number[]) => {
-        let idString = "";
-        ids.forEach((id) => {
-        idString = idString + id + ",";
-    });
-
-    return axiosInstance.delete(API_URL + "/comments/" + idString);
+    return api.comments.deleteComments(ids);
 };
 
 export const deleteComment = async (id: number) => {
-    return axiosInstance.delete(API_URL + "/comments/" + id);
+    return api.comments.deleteComment(id);
 };
 
 export const getTags = async (params?: Object) => {
-    return axiosInstance.get(API_URL + "/tags", {
-    params: params,
-  });
+    try {
+        const result = await api.tags.getTags(params || {});
+        return {
+            data: { data: result },
+            status: 200,
+        };
+    } catch (error) {
+        throw error;
+    }
 };
 
 export const deletePostByIDs = async (ids: number[]) => {
-    let idString = "";
-    ids.forEach((id) => {
-    idString = idString + id + ",";
-  });
-
-    return axiosInstance.delete(API_URL + "/posts/" + idString);
+    return api.posts.deletePosts(ids);
 };
 
-export function getFormattedDate(ms: number) {
-    let date = new Date(ms);
-
-    let Y = date.getFullYear();
-    let M = (date.getMonth() + 1 < 10 ? "0" + (date.getMonth() + 1) : date.getMonth() + 1);
-    let D = date.getDate() < 10 ? "0" + date.getDate() : date.getDate();
-    let h = date.getHours() < 10 ? "0" + date.getHours() : date.getHours();
-    let m = date.getMinutes() < 10 ? "0" + date.getMinutes() : date.getMinutes();
-    let s = date.getSeconds() < 10 ? "0" + date.getSeconds() : date.getSeconds();
-    return `${Y}-${M}-${D} ${h}:${m}:${s}`;
-}
-
-export const formatDate = getFormattedDate;
-
-export function getFormattedDateWithoutTime(ms: number) {
-    let date = new Date(ms);
-
-    let Y = date.getFullYear() + "年";
-    let M =
-        (date.getMonth() + 1 < 10
-        ? "0" + (date.getMonth() + 1)
-        : date.getMonth() + 1) + "月";
-    let D = (date.getDate() < 10 ? "0" + date.getDate() : date.getDate()) + "日";
-
-    return Y + M + D;
-}
+// 日期格式化函数
+export const getFormattedDate = newFormatDate;
+export const formatDate = newFormatDate;
+export const getFormattedDateWithoutTime = newFormatDateWithoutTime;
 
 // ********************************************************
 // *********************** Post ***************************
 // ********************************************************
 
-// 创建文章
 export const createPost = async (post: Post) => {
-    return axiosInstance.post(API_URL + "/posts", post);
+    // 转换Post模型到PostData
+    const postData = {
+        title: post.title,
+        slug: post.slug,
+        text: post.text,
+        summary: post.abstract, // abstract 映射到 summary
+        type: post.type as 'post' | 'page',
+        status: post.status as 'draft' | 'published' | 'archived',
+        allowComment: true, // 默认允许评论
+        authorID: Number(post.authorID),
+        categoryID: post.category?.id || undefined,
+        tagIDs: post.tags?.map(tag => tag.id).filter(id => id) || [],
+    };
+    
+    return api.posts.createPost(postData);
 };
 
-// 更新文章
 export const updatePost = async (post: Post) => {
-    return axiosInstance.put(API_URL + "/posts/" + post.id, post);
+    if (!post.id) throw new Error('Post ID is required for update');
+    
+    const postData = {
+        title: post.title,
+        slug: post.slug,
+        text: post.text,
+        summary: post.abstract, // abstract 映射到 summary
+        type: post.type as 'post' | 'page',
+        status: post.status as 'draft' | 'published' | 'archived',
+        allowComment: true, // 默认允许评论
+        authorID: Number(post.authorID),
+        categoryID: post.category?.id || undefined,
+        tagIDs: post.tags?.map(tag => tag.id).filter(id => id) || [],
+    };
+    
+    return api.posts.updatePost(post.id, postData);
 };
 
-// 删除文章
 export const deletePosts = async (ids: (number | string | undefined)[]) => {
-    const idString = convertIDList2String(ids);
-
-    return axiosInstance.delete(API_URL + "/posts/" + idString);
+    const validIds = ids.filter((id): id is number => 
+        id !== undefined && !isNaN(Number(id))
+    ).map(id => Number(id));
+    
+    return api.posts.deletePosts(validIds);
 };
 
 // ********************************************************
 // *********************** Tag ***************************
 // ********************************************************
 
-// 创建标签
-/**
- * 创建标签
- * @param tag 要创建的标签对象
- * @returns Promise 包含创建结果的对象
- */
 export const createTag = async (tag: Tag) => {
-    return axiosInstance.post(API_URL + "/tags", tag);
+    const tagData = {
+        name: tag.text, // text 映射到 name
+        description: tag.slug || '', // slug 映射到 description
+    };
+    
+    return api.tags.createTag(tagData);
 };
 
-// 更新标签
 export const updateTag = async (tag: Tag) => {
-    return axiosInstance.put(API_URL + "/tags/" + tag.id, tag);
+    if (!tag.id) throw new Error('Tag ID is required for update');
+    
+    const tagData = {
+        name: tag.text, // text 映射到 name  
+        description: tag.slug || '', // slug 映射到 description
+    };
+    
+    return api.tags.updateTag(tag.id, tagData);
 };
 
-// 删除标签
 export const deleteTags = async (ids: (number | undefined)[]) => {
-    const idString = convertIDList2String(ids);
-
-    return axiosInstance.delete(API_URL + "/tags/" + idString);
+    const validIds = ids.filter((id): id is number => id !== undefined);
+    return api.tags.deleteTags(validIds);
 };
 
 // ********************************************************
-// *********************** Cateogry ***************************
+// *********************** Category ***************************
 // ********************************************************
 
-// 创建分类
 export const createCategory = async (category: Category) => {
-    return axiosInstance.post(API_URL + "/categories", category);
+    const categoryData = {
+        name: category.text, // text 映射到 name
+        description: category.slug || '', // slug 映射到 description
+        parentID: undefined, // Category模型中没有parentID
+    };
+    
+    return api.categories.createCategory(categoryData);
 };
 
-// 更新分类
 export const updateCategory = async (category: Category) => {
-    return axiosInstance.put(API_URL + "/categories/" + category.id, category);
+    if (!category.id) throw new Error('Category ID is required for update');
+    
+    const categoryData = {
+        name: category.text, // text 映射到 name
+        description: category.slug || '', // slug 映射到 description  
+        parentID: undefined, // Category模型中没有parentID
+    };
+    
+    return api.categories.updateCategory(category.id, categoryData);
 };
 
-// 删除分类
 export const deleteCategories = async (ids: (number | undefined | string)[]) => {
-    const idString = convertIDList2String(ids);
-
-    return axiosInstance.delete(API_URL + "/categories/" + idString);
+    const validIds = ids.filter((id): id is number => 
+        id !== undefined && !isNaN(Number(id))
+    ).map(id => Number(id));
+    
+    return api.categories.deleteCategories(validIds);
 };
-
-// 将ID组成的数字数组转换成 `id1,id2,id3` 样式的字符串
-function convertIDList2String(ids: (number | string | undefined)[]): string {
-        const validIds = ids.filter((id): id is number => id !== undefined);
-        return validIds.join(",");
-}
 
 // ********************************************************
 // *********************** 用户验证 ************************
@@ -179,7 +226,7 @@ function convertIDList2String(ids: (number | string | undefined)[]): string {
 // 获取当前用户信息
 export async function requestCurrentUser() {
     try {
-        const response = await axiosInstance.get(`${BASE_URL}/users/me`);
+        const response = await httpClient.get('/users/me');
         if (response.data.success) {
             const userData = response.data.data;
             const user = new User();

@@ -68,6 +68,15 @@ export class User implements IUser {
     activated: boolean;
     role: string;
 
+    // 为了向后兼容，添加name属性作为username的别名
+    get name(): string {
+        return this.username;
+    }
+
+    set name(value: string) {
+        this.username = value;
+    }
+
     constructor() {
         this.id = 0;
         this.username = '';

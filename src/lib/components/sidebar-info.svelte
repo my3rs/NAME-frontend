@@ -2,12 +2,10 @@
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 	import Plus from "lucide-svelte/icons/plus";
 	import type { ComponentProps } from "svelte";
-    import axios from "axios";
-    import {API_URL} from "$lib/params/base";
+    import { metaApi } from "$lib/services/api";
 	import { Label } from "$lib/components/ui/label/index.js";
 
-
-    let meta = axios.get(API_URL + "/meta");
+    let meta = metaApi.getMeta();
 
 </script>
 
@@ -23,30 +21,30 @@
                 <div class="h-4 bg-gray-100 rounded animate-pulse"></div>
                 <div class="h-4 bg-gray-100 rounded animate-pulse"></div>
             </div>
-        {:then rsp}
+        {:then data}
             <div class="space-y-6 py-4">
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-1">
                         <div class="text-xs text-muted-foreground">文章</div>
-                        <div class="text-base font-medium">{rsp.data.posts_count}</div>
+                        <div class="text-base font-medium">{data.posts_count}</div>
                     </div>
                     <div class="space-y-1">
                         <div class="text-xs text-muted-foreground">页面</div>
-                        <div class="text-base font-medium">{rsp.data.pages_count}</div>
+                        <div class="text-base font-medium">{data.pages_count}</div>
                     </div>
                     <div class="space-y-1">
                         <div class="text-xs text-muted-foreground">分类</div>
-                        <div class="text-base font-medium">{rsp.data.categories_count}</div>
+                        <div class="text-base font-medium">{data.categories_count}</div>
                     </div>
                     <div class="space-y-1">
                         <div class="text-xs text-muted-foreground">标签</div>
-                        <div class="text-base font-medium">{rsp.data.tags_count}</div>
+                        <div class="text-base font-medium">{data.tags_count}</div>
                     </div>
                 </div>
 
                 <div class="space-y-1">
                     <div class="text-xs text-muted-foreground">评论</div>
-                    <div class="text-base font-medium">{rsp.data.comments_count}</div>
+                    <div class="text-base font-medium">{data.comments_count}</div>
                 </div>
             </div>
         {:catch error}

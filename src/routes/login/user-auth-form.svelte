@@ -22,13 +22,13 @@
 		errorMessage = "";
 
 		try {
-			const result = await login(username, password);
+			const result = await login({ username, password });
 			if (result.success) {
 				console.log("登录成功");
 				goto("/admin");
 			} else {
-				errorMessage = result.message || "登录失败：" + result.message;
-				console.error("登录失败:", result.message);
+				errorMessage = result.error?.message || "登录失败，请稍后重试";
+				console.error("登录失败:", result.error);
 			}
 		} catch (error) {
 			errorMessage = "登录时发生错误，请稍后重试";

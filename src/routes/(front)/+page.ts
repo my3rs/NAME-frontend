@@ -1,38 +1,25 @@
 import type { PageLoad } from './$types'
-import axios from 'axios'
-import {API_URL, DEBUG, PAGE_SIZE} from '$lib/params/base'
+import { postApi } from '$lib/services/api'
+import { PAGINATION_CONFIG, DEBUG_CONFIG } from '$lib/config'
 
 export const load: PageLoad = async () => {
     try {
-        const rsp = await axios.get(API_URL + '/posts', {
-            params: {
-                pageIndex: 1,
-                pageSize: PAGE_SIZE,
-                orderBy: "created_at desc"
-            }
+        const result = await postApi.getPosts({
+            pageIndex: 1,
+            pageSize: PAGINATION_CONFIG.defaultPageSize,
+            orderBy: "created_at desc"
         });
 
-        if (rsp.data.success) {
-            if (DEBUG) {
-                console.log("预加载数据成功.", rsp.data.page.total);
-            }
-            return {
-                posts: rsp.data.data,
-                pagination: rsp.data.page,
-            };
-        } else {
-            console.log("Failed to get posts from backend.");
-            if (DEBUG) {
-                console.error(rsp.data.message);
-            }
-
-            return {
-                posts: [],
-                pagination: null,
-            };
+        if (DEBUG_CONFIG.logApiCalls) {
+            console.log("预加载数据成功.", result.pagination?.totalCount || 0);
         }
-    } catch (err) {
-        console.error(err);
+        
+        return {
+            posts: result.data || [],
+            pagination: result.pagination,
+        };
+    } catch (error) {
+        console.error('Failed to load posts:', error);
         return {
             posts: [],
             pagination: null,

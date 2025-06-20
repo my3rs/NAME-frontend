@@ -14,9 +14,9 @@
         CodeInline, 
         CodeSnippet, 
         FrontHeading, 
-        FrontImage, 
-        CommentThread 
+        FrontImage 
     } from "$lib/components/ui/custom";
+    import CommentThread from "$lib/components/ui/custom/comment-thread.svelte";
     import * as Form from "$lib/components/ui/form";
     import { Input } from "$lib/components/ui/input";
     import { commentFormSchema, type CommentFormSchema } from "$lib/scheme";
@@ -28,7 +28,7 @@
     } from "sveltekit-superforms";
     import { zodClient } from "sveltekit-superforms/adapters";
     import { writable } from 'svelte/store';
-    import {getUser} from "$lib/login";
+    import {getUser} from "$lib/stores/auth";
     import {isLoggedIn} from "axios-jwt";
     import type {User} from "$lib/model";
     import Message from "lucide-svelte/icons/message-square-more";

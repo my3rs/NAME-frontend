@@ -1,29 +1,21 @@
-import { readable, get } from "svelte/store";
-import { dev } from "$app/environment";
+// 兼容性配置 - 重新导出新的配置系统
+// 这个文件保持向后兼容，但内部使用新的配置架构
 
-const base_url = dev ? readable("http://localhost:8000") : readable("/");
-export const BASE_URL = get(base_url);
+import { config, apiConfig, API_BASE_URL, DEBUG_CONFIG, PAGINATION_CONFIG } from '$lib/config';
 
-const api_url  = readable(BASE_URL + "/api/v1");
-export const API_URL = get(api_url);
+// 重新导出配置值以保持向后兼容
+export const BASE_URL = config.api.baseUrl;
+export const API_URL = apiConfig.baseUrl;
 
-const login = readable(API_URL + "/auth/login");
-export const LOGIN_URL = get(login);
+// 构建具体的URL
+export const LOGIN_URL = `${API_URL}/auth/login`;
+export const REGISTER_URL = `${API_URL}/auth/register`;
+export const REFRESH_TOKEN_URL = `${API_URL}/auth/refresh`;
+export const POST_URL = `${API_URL}/posts`;
+export const STATUS_URL = `${API_URL}/status`;
 
-const register_url = readable(API_URL + "/auth/register");
-export const REGISTER_URL = get(register_url);
+// 分页配置
+export const PAGE_SIZE = PAGINATION_CONFIG.defaultPageSize;
 
-const refresh_token_url = readable(API_URL + "/auth/refresh");
-export const REFRESH_TOKEN_URL = get(refresh_token_url);
-
-const post_url = readable(API_URL + "/posts");
-export const POST_URL = get(post_url);
-
-const status_url = readable(API_URL + "/status");
-export const STATUS_URL = get(status_url);
-
-// 每页文章数量
-// TODO: read from database
-export const PAGE_SIZE = 10;
-
-export const DEBUG = true;
+// 调试配置
+export const DEBUG = DEBUG_CONFIG.logApiCalls;
