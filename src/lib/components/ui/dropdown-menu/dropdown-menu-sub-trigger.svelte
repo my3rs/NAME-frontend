@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { DropdownMenu as DropdownMenuPrimitive, type WithoutChild } from "bits-ui";
-	import ChevronRight from "svelte-radix/ChevronRight.svelte";
+	import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
+	import ChevronRight from "@lucide/svelte/icons/chevron-right";
 	import { cn } from "$lib/utils.js";
 
 	let {
@@ -9,7 +9,7 @@
 		inset,
 		children,
 		...restProps
-	}: WithoutChild<DropdownMenuPrimitive.SubTriggerProps> & {
+	}: DropdownMenuPrimitive.SubTriggerProps & {
 		inset?: boolean;
 	} = $props();
 </script>
