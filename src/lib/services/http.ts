@@ -24,10 +24,12 @@ export const httpClient: AxiosInstance = axios.create({
     },
 });
 
-// Token刷新函数
+// Token刷新函数 - 匹配后端的刷新逻辑
 const requestRefresh: TokenRefreshRequest = async (
     refreshToken: string,
 ): Promise<IAuthTokens | string> => {
+    console.log('[HTTP] Token refresh triggered with token:', refreshToken?.substring(0, 20) + '...');
+    
     if (DEBUG_CONFIG.logAuthEvents) {
         console.debug('[HTTP] Token refresh triggered');
     }
@@ -38,13 +40,52 @@ const requestRefresh: TokenRefreshRequest = async (
             {},
             {
                 headers: {
-                    'Refresh-Token': refreshToken,
+                    'X-Refresh-Token': refreshToken,
                 },
             },
         );
 
-        const accessToken = response.headers['authorization'];
-        const newRefreshToken = response.headers['refresh-token'];
+        // Debug: Log the full response to understand what we're getting
+        if (DEBUG_CONFIG.logAuthEvents) {
+            console.debug('[HTTP] Token refresh response:', {
+                status: response.status,
+                headers: response.headers,
+                data: response.data
+            });
+        }
+
+        // Try to get tokens from headers first
+        let accessToken = response.headers['authorization'];
+        let newRefreshToken = response.headers['x-refresh-token'];
+
+        // If not in headers, try to get from response body
+        if (!accessToken && response.data) {
+            // Handle different possible response formats
+            if (typeof response.data === 'object') {
+                accessToken = response.data.accessToken || response.data.access_token || response.data.token;
+                newRefreshToken = response.data.refreshToken || response.data.refresh_token;
+            }
+        }
+
+        // 移除可能包含的引号
+        if (accessToken && typeof accessToken === 'string') {
+            if (accessToken.startsWith('"') && accessToken.endsWith('"')) {
+                accessToken = accessToken.slice(1, -1);
+            }
+        }
+        if (newRefreshToken && typeof newRefreshToken === 'string') {
+            if (newRefreshToken.startsWith('"') && newRefreshToken.endsWith('"')) {
+                newRefreshToken = newRefreshToken.slice(1, -1);
+            }
+        }
+
+        // 移除Bearer前缀，因为axios-jwt会自动添加
+        if (accessToken && typeof accessToken === 'string' && accessToken.startsWith('Bearer ')) {
+            accessToken = accessToken.substring(7);
+        }
+        if (newRefreshToken && typeof newRefreshToken === 'string' && newRefreshToken.startsWith('Bearer ')) {
+            newRefreshToken = newRefreshToken.substring(7);
+        }
 
         if (response.status === 200 && accessToken) {
             if (DEBUG_CONFIG.logAuthEvents) {
@@ -62,6 +103,13 @@ const requestRefresh: TokenRefreshRequest = async (
     } catch (error) {
         console.error('[HTTP] Token refresh error:', error);
         
+        // Log more details about the error for debugging
+        if (error?.response) {
+            console.error('[HTTP] Response status:', error.response.status);
+            console.error('[HTTP] Response headers:', error.response.headers);
+            console.error('[HTTP] Response data:', error.response.data);
+        }
+        
         // 清理认证状态
         if (browser) {
             await clearAuthTokens();
@@ -78,6 +126,8 @@ if (browser) {
         requestRefresh, 
         header: 'Authorization',
         headerPrefix: 'Bearer ',
+        // Add more detailed configuration to help debug
+        storage: getBrowserLocalStorage(),
     });
 }
 

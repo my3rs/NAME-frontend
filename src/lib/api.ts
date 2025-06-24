@@ -43,13 +43,22 @@ export const getPosts = async (
 ) => {
     try {
         const result = await api.posts.getPosts({
-            pageIndex: Number(pageIndex),
+            pageIndex: Number(pageIndex) - 1, // 前端从1开始，后端从0开始
             pageSize: Number(pageSize),
         });
         
-        // 转换新格式到旧格式以保持兼容性
+        // 转换后端格式到前端期望的格式
         return {
-            data: result,
+            data: {
+                success: result.success,
+                data: result.data,
+                page: {
+                    pageIndex: result.page.currentPage + 1, // 转换回前端的1开始计数
+                    pageSize: result.page.pageSize,
+                    total: result.page.totalCount,
+                    totalPages: result.page.totalPages,
+                }
+            },
             status: 200,
         };
     } catch (error) {

@@ -26,7 +26,7 @@
     import { deletePosts } from "$lib/api";
     import DataTable from "$lib/components/ui/custom/table.svelte";
     import { columns } from "./columns";
-    import { posts } from "$lib/stores/posts";
+    import { postsStore } from "$lib/stores";
     import type { PaginationState } from "@tanstack/table-core";
     import { on } from "svelte/events";
     import SidebarInfo from "$lib/components/sidebar-info.svelte";
@@ -62,7 +62,19 @@
     onMount(async () => {
         if (data.posts) {
             currentPosts = data.posts;
-            posts.set(data.posts);
+            // Convert Post[] to PostData[] and set with pagination
+            const postData = data.posts.map(post => ({
+                id: post.id,
+                title: post.title,
+                content: post.content,
+                slug: post.slug,
+                status: post.status,
+                tags: post.tags,
+                categories: post.categories,
+                createdAt: post.createdAt,
+                updatedAt: post.updatedAt
+            }));
+            postsStore.setData(postData, data.pagination);
         }
     });
 
@@ -74,7 +86,19 @@
             .then((rsp) => {
                 const items = rsp.data.data;
                 currentPosts = items;
-                $posts = items;
+                // Convert and update posts store
+                const postData = items.map(post => ({
+                    id: post.id,
+                    title: post.title,
+                    content: post.content,
+                    slug: post.slug,
+                    status: post.status,
+                    tags: post.tags,
+                    categories: post.categories,
+                    createdAt: post.createdAt,
+                    updatedAt: post.updatedAt
+                }));
+                postsStore.setData(postData, rsp.data.page);
                 pagination = rsp.data.page;
             });
     }
@@ -92,7 +116,20 @@
     }
 
     function updatePosts(posts_array : Post[]) {
-        posts.set(posts_array);
+        // Convert Post[] to PostData[] and update the store
+        const postData = posts_array.map(post => ({
+            id: post.id,
+            title: post.title,
+            content: post.content,
+            slug: post.slug,
+            status: post.status,
+            tags: post.tags,
+            categories: post.categories,
+            createdAt: post.createdAt,
+            updatedAt: post.updatedAt
+        }));
+        postsStore.setData(postData, pagination);
+        currentPosts = posts_array;
     }
 
     function removePost(id : string) {

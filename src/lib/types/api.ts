@@ -6,15 +6,16 @@ export interface ApiResponse<T = any> {
     code?: number;
 }
 
-// 分页响应类型
-export interface PaginatedResponse<T> extends ApiResponse<T[]> {
-    pagination: {
-        pageIndex: number;
+// 分页响应类型 - 匹配后端 PageResponse 结构
+export interface PaginatedResponse<T> {
+    success: boolean;
+    message: string;
+    data: T[];
+    page: {
+        currentPage: number;
         pageSize: number;
         totalCount: number;
         totalPages: number;
-        hasNext: boolean;
-        hasPrevious: boolean;
     };
 }
 
@@ -122,7 +123,7 @@ export interface RequestConfig {
     retryOnFailure?: boolean;
 }
 
-// 批量操作类型
+// 批量操作类型 - 匹配后端 BatchResponse 结构
 export interface BatchOperationRequest {
     ids: number[];
     action: string;
@@ -131,7 +132,7 @@ export interface BatchOperationRequest {
 
 export interface BatchOperationResponse {
     success: boolean;
-    successCount: number;
-    failureCount: number;
-    errors?: ApiError[];
+    message: string;
+    successList?: number[];
+    failedList?: number[];
 }

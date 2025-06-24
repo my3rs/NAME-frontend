@@ -62,9 +62,9 @@ class BaseApiService {
 class PostApiService extends BaseApiService {
     async getPosts(params: PaginationParams = {}): Promise<PaginatedResponse<PostData>> {
         const queryParams = {
-            pageIndex: params.pageIndex || 1,
+            pageIndex: params.pageIndex || 0, // 后端从0开始计数
             pageSize: params.pageSize || PAGINATION_CONFIG.defaultPageSize,
-            orderBy: params.orderBy || 'created_at desc',
+            order: params.orderBy || 'id desc', // 后端使用 order 字段
         };
         
         return this.get<PaginatedResponse<PostData>>('/posts', queryParams);
@@ -88,11 +88,9 @@ class PostApiService extends BaseApiService {
     }
 
     async deletePosts(ids: number[]): Promise<BatchOperationResponse> {
-        const request: BatchOperationRequest = {
-            ids,
-            action: 'delete'
-        };
-        return this.post<BatchOperationResponse>('/posts/batch', request);
+        // 后端使用逗号分隔的ID字符串：DELETE /posts/1,2,3
+        const idsString = ids.join(',');
+        return this.delete<BatchOperationResponse>(`/posts/${idsString}`);
     }
 
     async publishPost(id: number): Promise<PostData> {
@@ -221,7 +219,13 @@ class MetaApiService extends BaseApiService {
         tags_count: number;
         comments_count: number;
     }> {
-        return this.get('/meta');
+        // 后端直接返回iris.Map，不包装在标准响应中
+        try {
+            const response = await httpClient.get('/meta');
+            return response.data; // 直接返回数据，不经过handleApiResponse
+        } catch (error) {
+            throw handleApiError(error);
+        }
     }
 }
 

@@ -178,7 +178,7 @@
     }
 
     $: parentTags = tags && tags.length !== 0 ? tags.filter((tag) => {
-        return tag.path.length <= 5;
+        return tag.path && tag.path.length <= 5;
     }) : [];
 
 

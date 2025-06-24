@@ -2,7 +2,7 @@ import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { isLoggedIn } from 'axios-jwt';
-import { httpClient, setAuthTokens, clearAuthTokens, handleApiResponse, handleApiError } from './http';
+import { httpClient, setAuthTokens, clearAuthTokens, handleApiResponse, handleApiError, getAccessToken, getRefreshToken } from './http';
 import { User } from '$lib/model';
 import { AUTH_CONFIG, DEBUG_CONFIG } from '$lib/config';
 import type { LoginRequest, LoginResponse, UserData, ApiError, ApiResponse } from '$lib/types/api';
@@ -52,18 +52,50 @@ class AuthService {
         authError.set(null);
 
         try {
-            const response = await httpClient.post<LoginResponse>('/auth/login', credentials);
+            // 后端登录路径：/auth/login/:username
+            const response = await httpClient.post(
+                `/auth/login/${credentials.username}`, 
+                {
+                    username: credentials.username,
+                    password: credentials.password
+                }
+            );
             
-            // 从响应头获取token
-            const accessToken = response.headers['authorization'];
-            const refreshToken = response.headers['refresh-token'];
+            // 从响应头获取token，匹配后端的头名称，并处理可能包含引号的token
+            let accessToken = response.headers['authorization'];
+            let refreshToken = response.headers['x-refresh-token'];
+
+            // 移除可能包含的引号
+            if (accessToken && accessToken.startsWith('"') && accessToken.endsWith('"')) {
+                accessToken = accessToken.slice(1, -1);
+            }
+            if (refreshToken && refreshToken.startsWith('"') && refreshToken.endsWith('"')) {
+                refreshToken = refreshToken.slice(1, -1);
+            }
+
+            // 移除Bearer前缀，因为axios-jwt会自动添加
+            if (accessToken && accessToken.startsWith('Bearer ')) {
+                accessToken = accessToken.substring(7);
+            }
+            if (refreshToken && refreshToken.startsWith('Bearer ')) {
+                refreshToken = refreshToken.substring(7);
+            }
 
             if (accessToken && refreshToken) {
+                console.log('[Auth] Tokens received - Access:', accessToken.substring(0, 20) + '...');
+                console.log('[Auth] Tokens received - Refresh:', refreshToken.substring(0, 20) + '...');
+                
                 // 保存token
                 await setAuthTokens({
                     accessToken,
                     refreshToken,
                 });
+
+                // Verify tokens were stored correctly
+                const storedAccessToken = await getAccessToken();
+                const storedRefreshToken = await getRefreshToken();
+                console.log('[Auth] Tokens stored - Access:', storedAccessToken?.substring(0, 20) + '...');
+                console.log('[Auth] Tokens stored - Refresh:', storedRefreshToken?.substring(0, 20) + '...');
 
                 // 获取用户信息
                 await this.fetchCurrentUser();
@@ -116,6 +148,10 @@ class AuthService {
     // 获取当前用户信息
     async fetchCurrentUser(): Promise<User | null> {
         try {
+            console.log('[Auth] About to fetch current user info');
+            const currentAccessToken = await getAccessToken();
+            console.log('[Auth] Current access token before /users/me:', currentAccessToken?.substring(0, 20) + '...');
+            
             const response = await httpClient.get<ApiResponse<UserData>>('/users/me');
             const userData = handleApiResponse(response);
             
